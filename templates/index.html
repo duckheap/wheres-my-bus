@@ -1,0 +1,285 @@
+{% extends "layout.html" %}
+<!-- -->
+{% block title %}Geo Search{% endblock %}
+<!-- -->
+{% block body %}
+<br>
+<h1><a href="/" style="text-decoration:none">Where's My Bus?</a></h1>
+
+<h2>Houston Metro's real time bus arrivals.</h2>
+
+
+<p id="message" class="form-label">Search by bus route and stop number or use location.</p>
+<p class="form-label"><a id="map-link" target="_blank"></a></p>
+
+{% if msg %}<!-- -->
+<script>
+  document.querySelector("#message").textContent = "{{msg}}";
+  document.querySelector("#message").style.color = "red";
+</script>
+{% endif %}
+
+{% if nextbyStops %}<!-- -->
+
+<iframe
+  id="mapFrame"
+  align="middle"
+  width="360"
+  height="350"
+  frameborder="0"
+  scrolling="no"
+  marginheight="0"
+  marginwidth="0"
+  src="https://www.openstreetmap.org/export/embed.html?bbox={{bbox}}&amp;layer=transportmap"
+  style="border: 1px solid black"
+>
+</iframe>
+<br>
+
+<script>
+  let w = window.innerWidth;
+  let h = window.innerHeight;
+  w > 600 ? w = 600 : w = w*.85;
+  h > 400 ? h = 400 : h = h*.25;
+  
+  document.querySelector("#mapFrame").width = w;
+  document.querySelector("#mapFrame").height = h;
+</script>
+
+<br clear="all" />
+
+{% for nextbyStop in nextbyStops %}
+
+{# {% if nextbyStop["NextArrivals"] %} #}
+<div class="form-label">
+<p>Stop: {{nextbyStop["Stop"]}} - {{nextbyStop["Distance"]}} miles away.</p>
+<!--</li>-->
+<ul>
+  {% for NextArrival in nextbyStop["NextArrivals"] %}
+  <li><a
+    href="realtime/{{NextArrival['RouteName']}}/{{nextbyStop['StopNumber']}}"
+    >Bus: {{NextArrival["Route"]}} - {{NextArrival["DirectionAndDestination"]}}</a
+    >
+    <ol>
+      {% for arrival in NextArrival["Arrivals"] %}
+      <li>{{arrival}}</li>
+      {% endfor %}
+    </ol>
+  </li>
+
+  {% endfor %}
+</ul>
+</div>
+
+
+{# {% endif %} #}<!-- -->
+{% endfor %}<!-- -->
+<br>
+<hr>
+<br>
+
+{% endif %}
+
+
+
+
+
+<!-- Routes and Stop Form -->
+
+<div class="form-label">
+<form id="routeAndStop">
+  <div class="row g-2 align-items-center" style="padding-bottom: .5em;">
+    <div class="col-auto">
+      <label for="route" class="col-form-label">Bus Route:</label>
+    </div>
+    <div class="col-auto">
+      <input type="number" id="route" name="route" class="form-control" size="3" max="999" min="1" inputmode="numeric" placeholder="2" required >
+    </div>
+
+  </div>
+ 
+
+  <div class="row g-2 align-items-center" style="padding-bottom: .5em;">
+    <div class="col-auto">
+      <label for="stop" class="col-form-label">Stop Number:</label>
+    </div>
+    <div class="col-auto">
+      <input type="number" id="stop" name="stop" class="form-control" size="5" max="99999" min="4" inputmode="numeric" placeholder="1234" required >
+    </div>
+
+  </div>
+ 
+
+  
+  <input type="button" class="btn btn-primary" onclick="getRouteAtStop()" value="Find Next Bus" />
+
+
+</form>
+</div>
+<br>
+<div class="form-label">
+<!-- Location Form -->
+<form id="locationForm" action="/" method="post">
+  <input
+  autocomplete="off"
+  id="lat"
+  name="lat"
+  placeholder="Latitude"
+  type="hidden"
+/>
+
+<input
+  autocomplete="off"
+  id="lon"
+  name="lon"
+  placeholder="Longitude"
+  type="hidden"
+/>
+
+<input autocomplete="off" id="accuracy" name="accuracy" type="hidden" />
+
+  <div class="row g-1 align-items-center" style="padding-bottom: .5em;">
+    <div class="col-auto">
+      <label for="street" class="col-form-label">Enter address, unique place, or leave blank for geolocation:</label>
+      <input type="text" id="street" name="street" class="form-control" size="28" placeholder="901 Bagby St" aria-describedby="faddress">
+      <span id="faddress" class="form-text">
+        
+      </span>
+    </div>
+  </div>
+
+
+
+  <div class="row g-2 align-items-center" style="padding-bottom: .5em;">
+    <div class="col-auto">
+      <label for="radius" class="col-form-label">Radius in miles:</label>
+    </div>
+    <div class="col-auto">
+      <input type="number" id="radius" name="radius" class="form-control" size="4" maxlength="4" max="5" min=".05" step=".05" inputmode="numeric" placeholder=".20" value=".20" required >
+    </div>
+
+  </div>
+
+
+
+  
+  <!-- <button type="submit">Find Street Address</button> -->
+  <!-- <input type="button" onclick="geoFromAddress()" value="Find By Street Address" /> -->
+  <input type="button" class="btn btn-primary" onclick="locationForm()" value="Use Location" />
+
+
+</form>
+</div>
+
+<br>
+
+{% if display_name %}
+<script>
+  document.querySelector("#map-link").textContent =
+    "{{ display_name|safe }}";
+  document.querySelector("#map-link").href =
+    "https://www.openstreetmap.org/#map=14/{{lat}}/{{lon}}&layers=T";
+</script>
+
+{% elif lon %}
+
+
+<script>
+  document.querySelector("#map-link").textContent =
+    "Coords: {{lat|truncate(7, True, '')}}, {{lon|truncate(8, True, '')}}";
+  document.querySelector("#map-link").href =
+    "https://www.openstreetmap.org/#map=14/{{lat}}/{{lon}}&layers=T";
+  if ({{accuracy}} > 0){
+    document.querySelector("#message").textContent =
+    "Geolocation Accuracy: {{accuracy}} meters.";
+  }
+
+</script>
+{% endif %}
+
+<!-- -->
+<script>
+  function getLocation() {
+    // check to make sure geolocation is possible
+    if (navigator.geolocation) {
+      var options = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      };
+      document.querySelector("#message").textContent = "Locating…";
+      navigator.geolocation.getCurrentPosition(success, error, options);
+    } else {
+      console.log("Geolocation is not supported");
+      document.querySelector("#message").textContent =
+        "Geolocation is not supported";
+    }
+  }
+
+  function error(err) {
+    console.warn(`ERROR(${err.code}): ${err.message}`);
+    console.log(`ERROR(${err.code}): ${err.message}`);
+    document.querySelector("#message").textContent =
+      "Unable to retrieve your location";
+  }
+
+  function success(pos) {
+    var query = pos.coords.latitude + ", " + pos.coords.longitude;
+    // console.log("coordinates: " + query);
+    // console.log("accuracy: " + pos.coords.accuracy + " meters.");
+    // document.querySelector("#message1").textContent = `coordinates: ${query}`;
+    // document.querySelector(
+    //   "#message2"
+    // ).textContent = `accuracy: ${pos.coords.accuracy} meters.`;
+
+    // now we have coordinates, it is time to use them to
+    document.querySelector("#lat").value = pos.coords.latitude;
+    document.querySelector("#lon").value = pos.coords.longitude;
+    document.querySelector("#accuracy").value = pos.coords.accuracy;
+    // Submits the form
+    document.querySelector("#locationForm").submit();
+  }
+
+  // This function creates a url for the route/stop and loads it.
+  function getRouteAtStop() {
+    route = document.querySelector("#route").value;
+    stopId = document.querySelector("#stop").value;
+
+    if ((route > 0 && route < 1000) && (stopId > 0 && stopId < 10000)) {
+      window.location.assign(`/realtime/${route}/${stopId}`);
+    } else {
+      alert("Both route and stop number need to be filled out with numbers.")
+    }
+    
+  }
+
+  function latlonformshown(){
+    latlon = document.querySelector("#latlon").value;
+    
+    if (latlon != "") {
+      document.querySelector("#latlonformshown").submit();
+    } else {
+      alert("Please enter proper coordinates.")
+    }
+
+  }
+
+  
+  function locationForm(){
+    street = document.querySelector("#street").value;
+    
+    if (street != "") {
+      document.querySelector("#locationForm").submit();
+    } else {
+      getLocation();
+    }
+
+  }
+
+</script>
+
+
+
+<!-- -->
+{% endblock %}
+

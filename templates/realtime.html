@@ -1,0 +1,27 @@
+{% extends "layout.html" %}
+<!-- -->
+{% block title %}Route/StopID Search{% endblock %}
+<!-- -->
+{% block body %}
+<!---->
+{% if real %}
+<!---->
+<br>
+<h1><a href="/" style="text-decoration:none">Where's My Bus?</a></h1>
+
+<h2>Houston Metro's real time bus arrivals.</h2>
+<div class="form-label">
+  {{real["Stop"]}}<br />
+  {{real["Route"]}} - {{real["Direction"]}}<br />
+  <br>
+  {% for arrival in real["Trips"] %}
+  <!---->
+  {{arrival["trip"]}}<br />
+  {% endfor %}
+</div>
+
+<!---->
+{% endif %}
+<!---->
+{% endblock %}
+<!---->
